@@ -151,7 +151,7 @@ internal sealed partial class UnoWebGpuView : SurfaceView, ISurfaceHolderCallbac
 		{
 			while (_surfaceReady && !_disposed)
 			{
-				_renderEvent.Wait(TimeSpan.FromMilliseconds(100));
+				_renderEvent.Wait();
 				_renderEvent.Reset();
 
 				if (!_surfaceReady || _disposed || !_renderRequested)
