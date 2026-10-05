@@ -38,9 +38,17 @@ internal sealed partial class UnoWebGpuView : SurfaceView, ISurfaceHolderCallbac
 	private int _width, _height;
 	private readonly ManualResetEventSlim _renderEvent = new(false);
 	private IntPtr _nativeWindow; // Must stay alive while the wgpu surface references it
+	private readonly ChoreographerFramePacer _framePacer;
 
 	public UnoWebGpuView(Context context) : base(context)
 	{
+		// Frames start on vsync, and the vsync time travels with the request to the render thread.
+		_framePacer = new ChoreographerFramePacer(() =>
+		{
+			_renderRequested = true;
+			_renderEvent.Set();
+		});
+
 		ExploreByTouchHelper = new UnoExploreByTouchHelper(this);
 		TextInputPlugin = new TextInputPlugin(this);
 		ViewCompat.SetAccessibilityDelegate(this, ExploreByTouchHelper);
@@ -58,8 +66,7 @@ internal sealed partial class UnoWebGpuView : SurfaceView, ISurfaceHolderCallbac
 	public void InvalidateRender()
 	{
 		ExploreByTouchHelper.InvalidateRoot();
-		_renderRequested = true;
-		_renderEvent.Set();
+		_framePacer.RequestFrame();
 	}
 
 	public void ResetRendererContext()
@@ -217,7 +224,7 @@ internal sealed partial class UnoWebGpuView : SurfaceView, ISurfaceHolderCallbac
 		try
 		{
 			compositionTarget.Renderer = _renderer!;
-			var nativeClipPath = compositionTarget.OnNativePlatformFrameRequested(context);
+			var nativeClipPath = compositionTarget.OnNativePlatformFrameRequested(context, vsyncTimestamp: _framePacer.TakeVsyncTimestamp());
 
 			ApplicationActivity.NativeLayerHost!.Path = nativeClipPath;
 
@@ -315,6 +322,7 @@ internal sealed partial class UnoWebGpuView : SurfaceView, ISurfaceHolderCallbac
 		if (disposing)
 		{
 			_disposed = true;
+			_framePacer.Dispose();
 			_renderEvent.Set();
 			_renderThread?.Join(TimeSpan.FromSeconds(2));
 			// The backend owns device objects built on the swapchain, so it goes first.

@@ -30,12 +30,15 @@ internal sealed partial class UnoCanvasView : GLSurfaceView, IUnoRenderView
 	public TextInputPlugin TextInputPlugin { get; }
 
 	private readonly InternalRenderer _renderer;
+	private readonly ChoreographerFramePacer _framePacer;
 
 	public UnoCanvasView(Context context) : base(context)
 	{
+		// Frames start on vsync: the callback is what asks the GL thread to draw.
+		_framePacer = new ChoreographerFramePacer(() => RequestRender());
 		SetEGLContextClientVersion(2);
 		SetEGLConfigChooser(8, 8, 8, 8, 0, 8);
-		SetRenderer(_renderer = new InternalRenderer());
+		SetRenderer(_renderer = new InternalRenderer(_framePacer));
 		ExploreByTouchHelper = new UnoExploreByTouchHelper(this);
 		TextInputPlugin = new TextInputPlugin(this);
 		ViewCompat.SetAccessibilityDelegate(this, ExploreByTouchHelper);
@@ -60,8 +63,18 @@ internal sealed partial class UnoCanvasView : GLSurfaceView, IUnoRenderView
 	public void InvalidateRender()
 	{
 		ExploreByTouchHelper.InvalidateRoot();
-		// Request the call of IRenderer.OnDrawFrame for one frame
-		RequestRender();
+		// Request the call of IRenderer.OnDrawFrame for one frame, at the next vsync
+		_framePacer.RequestFrame();
+	}
+
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			_framePacer.Dispose();
+		}
+
+		base.Dispose(disposing);
 	}
 
 	public override bool OnCheckIsTextEditor()
@@ -138,7 +151,7 @@ internal sealed partial class UnoCanvasView : GLSurfaceView, IUnoRenderView
 
 	// Copied from https://github.com/mono/SkiaSharp/blob/main/source/SkiaSharp.Views/SkiaSharp.Views/Platform/Android/SKGLSurfaceView.cs
 	// and modified to also add rendering without OpenGL
-	private class InternalRenderer() : Java.Lang.Object, IRenderer
+	private class InternalRenderer(ChoreographerFramePacer framePacer) : Java.Lang.Object, IRenderer
 	{
 		private ISwapChain? _context;
 		private IDrawingFactory? _renderer;
@@ -159,7 +172,7 @@ internal sealed partial class UnoCanvasView : GLSurfaceView, IUnoRenderView
 			// GLSurfaceView swaps implicitly (Present is a no-op).
 			var ct = (CompositionTarget)Microsoft.UI.Xaml.Window.CurrentSafe!.RootElement!.Visual.CompositionTarget!;
 			ct.Renderer = _renderer!;
-			var nativeClipPath = ct.OnNativePlatformFrameRequested(_context);
+			var nativeClipPath = ct.OnNativePlatformFrameRequested(_context, vsyncTimestamp: framePacer.TakeVsyncTimestamp());
 
 			ApplicationActivity.NativeLayerHost!.Path = nativeClipPath;
 

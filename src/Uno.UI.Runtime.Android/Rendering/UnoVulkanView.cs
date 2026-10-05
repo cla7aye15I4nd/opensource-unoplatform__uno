@@ -54,7 +54,7 @@ internal sealed partial class UnoVulkanView : SurfaceView, ISurfaceHolderCallbac
 
 		// The MAILBOX swapchain never blocks on present, so frames are released on vsync instead. The request flag
 		// is raised here, not in InvalidateRender, so the render loop's timed wait cannot present off-vsync.
-		_framePacer = new ChoreographerFramePacer(_ =>
+		_framePacer = new ChoreographerFramePacer(() =>
 		{
 			_renderRequested = true;
 			_renderEvent.Set();
@@ -265,7 +265,7 @@ internal sealed partial class UnoVulkanView : SurfaceView, ISurfaceHolderCallbac
 		try
 		{
 			compositionTarget.Renderer = _renderer!;
-			var nativeClipPath = compositionTarget.OnNativePlatformFrameRequested(context);
+			var nativeClipPath = compositionTarget.OnNativePlatformFrameRequested(context, vsyncTimestamp: _framePacer.TakeVsyncTimestamp());
 
 			ApplicationActivity.NativeLayerHost!.Path = nativeClipPath;
 
