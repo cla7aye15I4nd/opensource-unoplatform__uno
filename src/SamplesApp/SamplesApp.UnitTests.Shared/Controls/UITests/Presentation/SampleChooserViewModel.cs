@@ -500,7 +500,11 @@ namespace SampleControl.Presentation
 #endif
 		}
 
-		internal void SetWindow(Window window) => _window = window;
+		internal void SetWindow(Window window)
+		{
+			_window = window;
+			ApplyMicaBackdrop();
+		}
 
 		internal void OpenPlayground()
 		{
