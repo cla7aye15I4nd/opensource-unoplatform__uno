@@ -634,7 +634,7 @@ namespace SampleControl.Presentation
 
 				void UpdateFavorite()
 				{
-					IsFavoritedSample = CurrentSelectedSample != null ? FavoriteSamples.Contains(CurrentSelectedSample) : false;
+					SyncFavoritedSample();
 				}
 
 				switch (e.PropertyName)
@@ -942,16 +942,23 @@ namespace SampleControl.Presentation
 			SampleContents = samples;
 		}
 
-		private async Task ToggleFavorite(CancellationToken ct, SampleChooserContent sample)
+		/// <summary>Toggles, or sets <paramref name="isFavorite"/>; false when the stored list already matches and nothing was written.</summary>
+		private async Task<bool> ToggleFavorite(CancellationToken ct, SampleChooserContent sample, bool? isFavorite = null)
 		{
 			if (sample is null)
 			{
-				return;
+				return false;
 			}
 
 			var favorites = await GetFavoriteSamples(ct);
+			var wasFavorite = favorites.Contains(sample);
 
-			if (favorites.Contains(sample))
+			if (isFavorite == wasFavorite)
+			{
+				return false;
+			}
+
+			if (wasFavorite)
 			{
 				favorites.Remove(sample);
 			}
@@ -967,6 +974,7 @@ namespace SampleControl.Presentation
 
 			OnSelectedCategoryChanged();
 			UpdateFavorites();
+			return true;
 		}
 
 		private async Task LoadPreviousTest(CancellationToken ct)
