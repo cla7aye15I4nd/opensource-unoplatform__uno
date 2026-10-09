@@ -23,6 +23,7 @@ namespace Uno.UI.Runtime;
 ///   * AccessibilityAnnouncer.AccessibilityImpl
 ///   * UIElementAccessibilityHelper.ExternalOnChildAdded / ExternalOnChildRemoved
 ///   * VisualAccessibilityHelper.ExternalOnVisualOffsetOrSizeChanged
+///     (these two once a bridge is enabled, see <see cref="EnsureTreeNotifications"/>)
 ///
 /// Per-window instances MUST NOT write to these slots directly; they receive
 /// fan-out calls via the <c>Route*</c> methods on <see cref="SkiaAccessibilityBase"/>.
@@ -53,13 +54,21 @@ internal static class AccessibilityRouter
 			}
 
 			AccessibilityAnnouncer.AccessibilityImpl = new RouterAnnouncerShim();
-			UIElementAccessibilityHelper.ExternalOnChildAdded = OnChildAdded;
-			UIElementAccessibilityHelper.ExternalOnChildRemoved = OnChildRemoved;
-			VisualAccessibilityHelper.ExternalOnVisualOffsetOrSizeChanged = OnVisualOffsetOrSizeChanged;
 			AutomationPeer.AutomationPeerListener = new RouterAutomationPeerListener();
 
 			_initialized = true;
 		}
+	}
+
+	/// <summary>
+	/// Starts routing visual tree changes, which costs every layout pass a lookup. A bridge calls this once it is
+	/// enabled: it builds its tree from scratch then, so the changes it missed don't matter.
+	/// </summary>
+	public static void EnsureTreeNotifications()
+	{
+		UIElementAccessibilityHelper.ExternalOnChildAdded = OnChildAdded;
+		UIElementAccessibilityHelper.ExternalOnChildRemoved = OnChildRemoved;
+		VisualAccessibilityHelper.ExternalOnVisualOffsetOrSizeChanged = OnVisualOffsetOrSizeChanged;
 	}
 
 	/// <summary>Updates the sticky active-owner reference.</summary>
